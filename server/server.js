@@ -23,6 +23,8 @@ app.use(bot.webhookCallback(`/bot${BOT_TOKEN}`));
 /*
  your bot commands and all the other stuff on here ....
 */
+bot.start((ctx) => ctx.reply('Welcome'));
+bot.hears('hi', (ctx) => ctx.reply('Hey there' + ctx.from.id));
 // and at the end just start server on PORT
 } else {
     bot.start((ctx) => ctx.reply('Welcome'));
