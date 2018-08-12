@@ -4,10 +4,12 @@ var Alert = mongoose.model('Alert', {
     text: {
         type: String,
         required: true,
-        minlength: 1,
-        trim: true
+        minlength: 4,
+        maxlength: 10,
+        trim: true,
+        unique: true
     },
-    chatId: {
+    userId: {
         type: Number,
         required: true
     }
