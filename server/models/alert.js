@@ -1,6 +1,6 @@
 var mongoose = require('mongoose');
 
-var Alert = mongoose.model('Alert', {
+var AlertSchema = new mongoose.Schema({
     text: {
         type: String,
         required: true,
@@ -15,4 +15,10 @@ var Alert = mongoose.model('Alert', {
     }
 });
 
-module.exports = { Alert };
+var getAllAlerts = (userId) => {
+    return Alert.find({userId}).exec();
+}
+
+var Alert = mongoose.model('Alert', AlertSchema);
+
+module.exports = { Alert, getAllAlerts };
