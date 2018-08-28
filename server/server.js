@@ -34,8 +34,10 @@ bot.start(async ctx => {
 
 const alertsButtons = (alerts) => {
   const buttons = alerts.map(item => {
-      return [Markup.callbackButton(`${item.text}`, `delete ${item._id}`)];
+      return Markup.callbackButton(`${item.text}`, `delete ${item._id}`);
   });
+
+  // console.log(buttons);
   return Extra.markup(Markup.inlineKeyboard(buttons, { columns: 2 }));
 }
 
@@ -43,7 +45,6 @@ const alertsKeyboard = Markup.keyboard([
   ['📢 New alert', '🗑️ Delete alert', '🔍 List alerts'], // Row1 with 2 buttons
 ])
 .resize()
-.oneTime()
 .extra();
 
 const newAlertScene = new Scene('newAlert');
@@ -53,7 +54,7 @@ newAlertScene.enter(ctx => {
 });
 
 newAlertScene.leave(ctx => {
-  ctx.reply('Click or type /start.');
+  ctx.reply('What do you want to do?', alertsKeyboard);
 });
 
 newAlertScene.hears([/line (\d+)/gi, /route (\d+)/gi], async ctx => {
@@ -78,7 +79,7 @@ const listAlertScene = new Scene('list');
 listAlertScene.enter(async ctx => {
   var userId = ctx.update.message.from.id;
   var alerts = await getAllAlerts(userId);
-  console.log(alerts);
+  // console.log(alerts);
   if(alerts.length) {
     await ctx.reply('Here are your alerts\nClick on them to remove.', alertsButtons(alerts));
   } else {
@@ -95,7 +96,7 @@ bot.action(/delete (.*)/, async ctx => {
   if(res.n === 1) {
     var alerts = await getAllAlerts(userId);
     var reply = alertsButtons(alerts);
-    if(!typeof reply.reply_markup.reply_markup === 'undefined') {
+    if(alerts.length) {
       await ctx.editMessageReplyMarkup(reply.reply_markup);
       await ctx.answerCbQuery('Alert removed.');
     } else {
@@ -108,9 +109,9 @@ bot.action(/delete (.*)/, async ctx => {
   }
 })
 
-listAlertScene.leave(ctx => {
-  ctx.reply('/start');
-});
+// listAlertScene.leave(ctx => {
+//   ctx.reply('What do you want to do?', alertsKeyboard);
+// });
 
 if(process.env.NODE_ENV === 'production') {
 bot.telegram.setWebhook(`${URL}/bot${BOT_TOKEN}`);
