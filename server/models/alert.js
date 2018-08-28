@@ -15,10 +15,16 @@ var AlertSchema = new mongoose.Schema({
     }
 });
 
-var getAllAlerts = (userId) => {
-    return Alert.find({userId}).exec();
-}
+var getAllAlerts = (userId) => Alert.find({userId}).exec();
+
+var deleteAlert = (alertId) => Alert.deleteOne({_id: alertId});
+
+var addAlert = (text, userId) => Alert.create({text, userId});
 
 var Alert = mongoose.model('Alert', AlertSchema);
 
-module.exports = { Alert, getAllAlerts };
+module.exports = { Alert, 
+                    getAllAlerts,
+                    deleteAlert,
+                    addAlert 
+                };

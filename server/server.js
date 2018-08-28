@@ -2,16 +2,21 @@ require('./config/config');
 
 const Telegraf = require('telegraf');
 const { Extra, Markup } = require('telegraf');
-const Composer = require('telegraf/composer');
+
 const session = require('telegraf/session');
 const Stage = require('telegraf/stage');
-const WizardScene = require('telegraf/scenes/wizard');
+const Scene = require('telegraf/scenes/base');
 
 const express = require('express');
 const mongodb = require('mongodb');
 
 var {mongoose} = require('./db/mongoose');
-var {Alert, getAllAlerts} = require('./models/alert');
+var { 
+  Alert, 
+  getAllAlerts,
+  deleteAlert,
+  addAlert 
+} = require('./models/alert');
 
 const app = express();
 
@@ -21,148 +26,91 @@ const URL = process.env.URL;
 
 const bot = new Telegraf(BOT_TOKEN);
 
-var alerts;
-var obj = {};
-
-bot.catch((err) => {
-  console.log('Sorry! Not able to connect to Telegram.\n'+ err);
-  return
+bot.start(async ctx => {
+  var name = ctx.update.message.from.first_name;
+  await ctx.reply(`Welcome ${name}.`);
+  await ctx.reply('What do you want to do?', alertsKeyboard);
 });
 
-const alertHandler = new Composer();
-
-alertHandler.hears('📢 Alerts', (ctx) => {
-  ctx.reply('📢 TTC Alerts configuration.', Markup
-  .keyboard([
-      ['📢 New alert', '🗑️ Delete alert', '🔍 List alerts'], // Row1 with 2 buttons
-      ['📝 Main menu'] // Row2 with 2 buttons
-  ])
-  .oneTime()
-  .resize()
-  .extra()
-  );
-  return ctx.wizard.next();
-});
-
-alertHandler.hears('🔍 List alerts', (ctx) => {
-  var userId = ctx.from.id;
-  alerts = getAllAlerts(userId);
-
-  alerts.then((myAlerts) => {
-
-    myAlerts.forEach((anAlert) => {
-      obj[anAlert.text] = anAlert.id;
-    });
-    
-    const buttons = Object.keys(obj)
-      .map(key => Markup.callbackButton(key, obj[key]));
-      console.log(buttons);
-    ctx.reply('Here they are. Click to remove.', Extra.HTML().markup((m) => m.inlineKeyboard(buttons, {columns: 2})))
-    .catch((err) => {
-    ctx.reply('An error has occurred while fetching alerts.' + err);
+const alertsButtons = (alerts) => {
+  const buttons = alerts.map(item => {
+      return [Markup.callbackButton(`${item.text}`, `delete ${item._id}`)];
   });
+  return Extra.markup(Markup.inlineKeyboard(buttons, { columns: 2 }));
+}
 
-  return ctx.wizard.next();
-})
+const alertsKeyboard = Markup.keyboard([
+  ['📢 New alert', '🗑️ Delete alert', '🔍 List alerts'], // Row1 with 2 buttons
+])
+.resize()
+.oneTime()
+.extra();
+
+const newAlertScene = new Scene('newAlert');
+
+newAlertScene.enter(ctx => {
+  ctx.reply('Type the number of line or route you want to be alerted.\nEg. Line 1, Route 34');
 });
 
-alertHandler.hears('📢 New alert', (ctx) => {
-  return ctx.reply('Type one filter at a time: Line 1 OR Line 2 OR Pape OR Route 510')
-  .then(() => {
-      return bot.on('message', (ctx) => {
-          var text = ctx.message.text;
-          var userId = ctx.message.from.id;
-          var alertBody = {
-            text,
-            userId
-          }
-          var alert = new Alert(alertBody);
-          return alert.save().then(() => {
-            ctx.reply('Your alert has been saved.');
-            return ctx.scene.leave();
-          })
-          .catch((e) => {
-            ctx.reply('An error has occurred. \n' + e.message);
-            return ctx.scene.leave();
-          });
-        });
-      });
+newAlertScene.leave(ctx => {
+  ctx.reply('Click or type /start.');
 });
 
-const superWizard = new WizardScene('super-wizard',
-  (ctx) => {
-    ctx.reply('Welcome to TTC Alerts.', Markup
-    .keyboard([
-        ['📢 Alerts', '🕒 Time config'], // Row1 with 2 buttons
-        ['☸ Setting', '👥 Share'] // Row2 with 2 buttons
-    ])
-    .oneTime()
-    .resize()
-    .extra()
-);
-    return ctx.wizard.next();
-  },
-  alertHandler,
-  alertHandler,
-  (ctx) => {
-    ctx.reply('Step 4');
-    return ctx.wizard.next();
-  },
-  (ctx) => {
-    ctx.scene.leave();
-    return ctx.reply('/start');
+newAlertScene.hears([/line (\d+)/gi, /route (\d+)/gi], async ctx => {
+  var description = ctx.update.message.text;
+  var userId = ctx.update.message.from.id;
+  var alert = await addAlert(description, userId).catch((e) => e.message);
+  if(alert._id) {
+    await ctx.reply('Alert added!');
+  } else {
+    await ctx.reply(`An error has occurred. Try again.\n${alert}`);
   }
-);
+    return await ctx.scene.leave();
+    // console.log('left');
+});
 
-// bot.hears('📝 Main menu', ({ reply }) => {
-//   return reply('Welcome to TTC Alerts.', Markup
-//       .keyboard([
-//           ['📢 Alerts', '🕒 Time config'], // Row1 with 2 buttons
-//           ['☸ Setting', '👥 Share'] // Row2 with 2 buttons
-//       ])
-//       .oneTime()
-//       .resize()
-//       .extra()
-//   );
-// });
+newAlertScene.on('message', ctx => {
+  ctx.reply('This is the pattern you should follow:\nLine 1\nLine 3\nRoute 12\nRoute 510');
+});
 
-// bot.hears('📢 Alerts', ({reply}) => {
-//   return reply('📢 TTC Alerts configuration.', Markup
-//   .keyboard([
-//       ['📢 New alert', '🗑️ Delete alert', '🔍 List alerts'], // Row1 with 2 buttons
-//       ['📝 Main menu'] // Row2 with 2 buttons
-//   ])
-//   .oneTime()
-//   .resize()
-//   .extra()
-//   );
-// });
+const listAlertScene = new Scene('list');
 
-// bot.hears('📢 New alert', (ctx) => {
-//     return ctx.reply('Type one filter at a time: Line 1 OR Line 2 OR Pape OR Route 510').then(() => {
-//       return bot.on('message', (ctx) => {
-//         var text = ctx.message.text;
-//         var userId = ctx.message.from.id;
-//         var alertBody = {
-//           text,
-//           userId
-//         }
-//         var alert = new Alert(alertBody);
+listAlertScene.enter(async ctx => {
+  var userId = ctx.update.message.from.id;
+  var alerts = await getAllAlerts(userId);
+  console.log(alerts);
+  if(alerts.length) {
+    await ctx.reply('Here are your alerts\nClick on them to remove.', alertsButtons(alerts));
+  } else {
+    await ctx.reply('You don\'t have any alerts registered.');
+    ctx.scene.leave();
+  }
+});
 
-//         return alert.save().then(() => {
-//           return ctx.reply('Your alert has been saved.').then(() => {
-//             return ctx.reply('/start');
-//           });
-//         })
-//         .catch((e) => {
-//           return ctx.reply('An error has occurred. \n' + e.message);
-//         });
-//       })
-//     });
-// });
+bot.action(/delete (.*)/, async ctx => {
+  var userId = ctx.chat.id;
+  const id = ctx.match[1];
+  // console.log(id);
+  var res = await deleteAlert(id);
+  if(res.n === 1) {
+    var alerts = await getAllAlerts(userId);
+    var reply = alertsButtons(alerts);
+    if(!typeof reply.reply_markup.reply_markup === 'undefined') {
+      await ctx.editMessageReplyMarkup(reply.reply_markup);
+      await ctx.answerCbQuery('Alert removed.');
+    } else {
+      await ctx.editMessageText('All alerts removed.');
+    }
 
+  } else {
+    ctx.reply('An error has occurred. Try again. /start');
+    // ctx.scene.leave();
+  }
+})
 
-// app.use(bodyParser.json());
+listAlertScene.leave(ctx => {
+  ctx.reply('/start');
+});
 
 if(process.env.NODE_ENV === 'production') {
 bot.telegram.setWebhook(`${URL}/bot${BOT_TOKEN}`);
@@ -176,10 +124,12 @@ app.get('/', (req, res) => {
 
 //SESSION HANDLER
 
-const stage = new Stage([superWizard], { default: 'super-wizard' });
+const stage = new Stage([newAlertScene, listAlertScene]);
 bot.use(session());
 bot.use(stage.middleware());
 
+bot.hears('📢 New alert', Stage.enter('newAlert'));
+bot.hears(['🗑️ Delete alert', '🔍 List alerts'], Stage.enter('list'));
 
 //app.post()
 app.listen(PORT, () => {
