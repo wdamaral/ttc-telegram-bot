@@ -11,12 +11,12 @@ const express = require('express');
 const mongodb = require('mongodb');
 
 var {mongoose} = require('./db/mongoose');
-var { 
-  Alert, 
+var { Alert } = require('./models/alert');
+var {  
   getAllAlerts,
   deleteAlert,
   addAlert 
-} = require('./models/alert');
+} = require('./services/alert.service');
 
 const app = express();
 
@@ -28,8 +28,8 @@ const bot = new Telegraf(BOT_TOKEN);
 
 bot.start(async ctx => {
   var name = ctx.update.message.from.first_name;
-  await ctx.reply(`Welcome ${name}.`);
-  await ctx.reply('What do you want to do?', alertsKeyboard);
+  await ctx.replyWithHTML(`Welcome <b>${name}</b>.`);
+  await ctx.reply('What do you want to do❓', alertsKeyboard);
 });
 
 const alertsButtons = (alerts) => {
@@ -50,28 +50,33 @@ const alertsKeyboard = Markup.keyboard([
 const newAlertScene = new Scene('newAlert');
 
 newAlertScene.enter(ctx => {
-  ctx.reply('Type the number of line or route you want to be alerted.\nEg. Line 1, Route 34');
+  ctx.replyWithHTML('<b>Type the station, line or route you want to be alerted.</b>\n<i>Eg. Line 1, Route 34, Victoria Park</i>');
 });
 
 newAlertScene.leave(ctx => {
-  ctx.reply('What do you want to do?', alertsKeyboard);
+  ctx.reply('What do you want to do❓', alertsKeyboard);
 });
 
 newAlertScene.hears([/line (\d+)/gi, /route (\d+)/gi], async ctx => {
   var description = ctx.update.message.text;
   var userId = ctx.update.message.from.id;
-  var alert = await addAlert(description, userId).catch((e) => e.message);
-  if(alert._id) {
-    await ctx.reply('Alert added!');
+  var alert = await addAlert(userId, description);
+  // console.log(alert);
+  if(!alert) {
+    await ctx.reply('👎 An error has occurred. Try again.');
   } else {
-    await ctx.reply(`An error has occurred. Try again.\n${alert}`);
+    if(alert._id) {
+      await ctx.reply('👍 Alert added!');
+    } else {
+      await ctx.reply(`👎 An error has occurred. Try again.\n${alert.message}`);
+    }
   }
     return await ctx.scene.leave();
     // console.log('left');
 });
 
 newAlertScene.on('message', ctx => {
-  ctx.reply('This is the pattern you should follow:\nLine 1\nLine 3\nRoute 12\nRoute 510');
+  ctx.replyWithHTML('🔒 This is the pattern you should follow:<b>\nLine 1\nLine 3\nRoute 12\nRoute 510</b>');
 });
 
 const listAlertScene = new Scene('list');
@@ -80,10 +85,14 @@ listAlertScene.enter(async ctx => {
   var userId = ctx.update.message.from.id;
   var alerts = await getAllAlerts(userId);
   // console.log(alerts);
+  
   if(alerts.length) {
-    await ctx.reply('Here are your alerts\nClick on them to remove.', alertsButtons(alerts));
+    await ctx.replyWithHTML('<b>Here are your alerts</b>\nClick on them to remove.', alertsButtons(alerts));
+  } else if(!alerts.message) {
+    await ctx.reply('😔 You don\'t have any alerts registered.');
+    ctx.scene.leave();
   } else {
-    await ctx.reply('You don\'t have any alerts registered.');
+    await ctx.reply('👎 An error has occurred. Try again.');
     ctx.scene.leave();
   }
 });
@@ -92,22 +101,24 @@ bot.action(/delete (.*)/, async ctx => {
   var userId = ctx.chat.id;
   const id = ctx.match[1];
   // console.log(id);
-  var res = await deleteAlert(id);
-  if(res.n === 1) {
+  var res = await deleteAlert(userId, id);
+  console.log(res);
+  if(!res) {
+    ctx.reply('👎 An error has occurred. Try again.');
+    
+  } else {
     var alerts = await getAllAlerts(userId);
+    
     var reply = alertsButtons(alerts);
     if(alerts.length) {
       await ctx.editMessageReplyMarkup(reply.reply_markup);
-      await ctx.answerCbQuery('Alert removed.');
+      await ctx.answerCbQuery('🗑️ Alert removed.');
     } else {
-      await ctx.editMessageText('All alerts removed.');
+      await ctx.editMessageText('🗑️ All alerts removed.');
     }
-
-  } else {
-    ctx.reply('An error has occurred. Try again. /start');
-    // ctx.scene.leave();
   }
-})
+});
+
 
 // listAlertScene.leave(ctx => {
 //   ctx.reply('What do you want to do?', alertsKeyboard);

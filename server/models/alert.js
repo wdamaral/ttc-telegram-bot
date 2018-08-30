@@ -6,8 +6,7 @@ var AlertSchema = new mongoose.Schema({
         required: true,
         minlength: 4,
         maxlength: 10,
-        trim: true,
-        unique: true
+        trim: true
     },
     userId: {
         type: Number,
@@ -15,16 +14,8 @@ var AlertSchema = new mongoose.Schema({
     }
 });
 
-var getAllAlerts = (userId) => Alert.find({userId}).exec();
-
-var deleteAlert = (alertId) => Alert.deleteOne({_id: alertId});
-
-var addAlert = (text, userId) => Alert.create({text, userId});
+AlertSchema.index({userId: 1, text: 1}, {unique: true});
 
 var Alert = mongoose.model('Alert', AlertSchema);
 
-module.exports = { Alert, 
-                    getAllAlerts,
-                    deleteAlert,
-                    addAlert 
-                };
+module.exports = { Alert };
