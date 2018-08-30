@@ -7,11 +7,11 @@ var TweetSchema = new mongoose.Schema({
         trim: true
     },
     createdAt: {
-        type: Number,
+        type: String,
         required: true
     },
     tweetId: {
-        type: Number,
+        type: String,
         required: true
     }
 });

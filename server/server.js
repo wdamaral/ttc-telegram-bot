@@ -3,6 +3,7 @@ require('./config/config');
 const Telegraf = require('telegraf');
 const { Extra, Markup } = require('telegraf');
 const Twit = require('twit');
+const moment = require('moment');
 
 const session = require('telegraf/session');
 const Stage = require('telegraf/stage');
@@ -42,23 +43,53 @@ const PORT = process.env.PORT;
 const URL = process.env.URL;
 
 const bot = new Telegraf(BOT_TOKEN);
-const twitterUserId = '72671626';
+const twitterUserId = process.env.MONITOR_ID;
 
 var stream = T.stream('statuses/filter', { follow: twitterUserId });
- 
+
+var sendLogMessage = (error) => {
+  return `There was a problem on the bot\n${err.message}`;
+}
+
 stream.on('tweet', async (tweet) => {
   var text = tweet.text;
   var createdAt = tweet.timestamp_ms;
   var tweetId = tweet.id;
-  var tweet = await addTweet(text, createdAt, tweetId);
+  try {
+    var tweet = await addTweet(text, createdAt, tweetId);
+  } catch(err) {
+    return bot.telegram.sendMessage(process.env.MY_ID, sendLogMessage(err));
+  }
+  
 
   if(tweet) {
-    getUsers(tweet.text);
+    try {
+      var users = await getUsers(tweet.text);
+    } catch (err){
+      return bot.telegram.sendMessage(process.env.MY_ID, sendLogMessage(err));
+    }
+    
+    if(!users) {
+      return
+    }
+    var message = 
+    `🚫 *TTC* has just informed an issue on the system.
+    
+    💬 *${tweet.text}*
+
+    🕑 *When:* _${moment(tweet.createdAt, 'x').format('LLL')}_`
+    users.forEach(user => {
+          bot.telegram.sendMessage(user, message, {parse_mode : 'markdown'}).catch((err) => console.log(err));
+    });
   }
 });
 
 stream.on('delete', async (tweet) => {
-  await deleteTweet(tweet.id);
+  try {
+    await deleteTweet(tweet.id)
+  } catch(err) {
+    bot.telegram.sendMessage(process.env.MY_ID, sendLogMessage(err));
+  }
 });
 
 bot.start(async ctx => {
