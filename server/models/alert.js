@@ -4,7 +4,7 @@ var AlertSchema = new mongoose.Schema({
     text: {
         type: String,
         required: true,
-        minlength: 4,
+        minlength: 1,
         maxlength: 10,
         trim: true
     },

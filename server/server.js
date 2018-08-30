@@ -2,21 +2,38 @@ require('./config/config');
 
 const Telegraf = require('telegraf');
 const { Extra, Markup } = require('telegraf');
+const Twit = require('twit');
 
 const session = require('telegraf/session');
 const Stage = require('telegraf/stage');
 const Scene = require('telegraf/scenes/base');
 
 const express = require('express');
-const mongodb = require('mongodb');
+// const mongodb = require('mongodb');
 
-var {mongoose} = require('./db/mongoose');
+// var {mongoose} = require('./db/mongoose');
 var { Alert } = require('./models/alert');
+
+const T = new Twit({
+  consumer_key:         process.env.CONSUMER_KEY,
+  consumer_secret:      process.env.CONSUMER_SECRET,
+  access_token:         process.env.ACCESS_TOKEN,
+  access_token_secret:  process.env.ACCESS_TOKEN_SECRET
+});
+
 var {  
   getAllAlerts,
   deleteAlert,
-  addAlert 
+  addAlert,
+  getUsers,
+  addDescription
 } = require('./services/alert.service');
+
+var {  
+  getAllTweets,
+  deleteTweet,
+  addTweet 
+} = require('./services/tweet.service');
 
 const app = express();
 
@@ -25,6 +42,24 @@ const PORT = process.env.PORT;
 const URL = process.env.URL;
 
 const bot = new Telegraf(BOT_TOKEN);
+const twitterUserId = '72671626';
+
+var stream = T.stream('statuses/filter', { follow: twitterUserId });
+ 
+stream.on('tweet', async (tweet) => {
+  var text = tweet.text;
+  var createdAt = tweet.timestamp_ms;
+  var tweetId = tweet.id;
+  var tweet = await addTweet(text, createdAt, tweetId);
+
+  if(tweet) {
+    getUsers(tweet.text);
+  }
+});
+
+stream.on('delete', async (tweet) => {
+  await deleteTweet(tweet.id);
+});
 
 bot.start(async ctx => {
   var name = ctx.update.message.from.first_name;
@@ -33,9 +68,10 @@ bot.start(async ctx => {
 });
 
 const alertsButtons = (alerts) => {
-  const buttons = alerts.map(item => {
-      return Markup.callbackButton(`${item.text}`, `delete ${item._id}`);
-  });
+  const buttons = alerts
+    .map(item => {
+        return Markup.callbackButton(`${addDescription(item.text)}`, `delete ${item._id}`);
+    });
 
   // console.log(buttons);
   return Extra.markup(Markup.inlineKeyboard(buttons, { columns: 2 }));
@@ -58,7 +94,7 @@ newAlertScene.leave(ctx => {
 });
 
 newAlertScene.hears([/line (\d+)/gi, /route (\d+)/gi], async ctx => {
-  var description = ctx.update.message.text;
+  var description = ctx.match[1];
   var userId = ctx.update.message.from.id;
   var alert = await addAlert(userId, description);
   // console.log(alert);

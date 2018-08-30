@@ -10,7 +10,10 @@ var TweetSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
-
+    tweetId: {
+        type: Number,
+        required: true
+    }
 });
 
 var Tweet = mongoose.model('Tweet', TweetSchema);
