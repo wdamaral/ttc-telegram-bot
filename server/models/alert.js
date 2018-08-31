@@ -5,7 +5,7 @@ var AlertSchema = new mongoose.Schema({
         type: String,
         required: true,
         minlength: 1,
-        maxlength: 10,
+        maxlength: 20,
         trim: true
     },
     userId: {

@@ -48,7 +48,7 @@ const twitterUserId = process.env.MONITOR_ID;
 var stream = T.stream('statuses/filter', { follow: twitterUserId });
 
 var sendLogMessage = (error) => {
-  return `There was a problem on the bot\n${err.message}`;
+  return `There was a problem on the bot\n${error.message}`;
 }
 
 stream.on('tweet', async (tweet) => {
@@ -68,18 +68,19 @@ stream.on('tweet', async (tweet) => {
     } catch (err){
       return bot.telegram.sendMessage(process.env.MY_ID, sendLogMessage(err));
     }
-    
+    console.log(users);
     if(!users) {
       return
     }
     var message = 
-    `🚫 *TTC* has just informed an issue on the system.
+    `🚫 <strong>TTC</strong> has just informed an issue on the system.
     
-    💬 *${tweet.text}*
+    💬 <strong>${tweet.text.substr(0, tweet.text.indexOf(':'))}:</strong> ${tweet.text.substring(tweet.text.indexOf(':') + 1)}
 
-    🕑 *When:* _${moment(tweet.createdAt, 'x').format('LLL')}_`
+    🕑 <strong>When:</strong> <i>${moment(tweet.createdAt, 'x').format('LLL')}</i>`
     users.forEach(user => {
-          bot.telegram.sendMessage(user, message, {parse_mode : 'markdown'}).catch((err) => console.log(err));
+      console.log('entrou');
+          bot.telegram.sendMessage(user, message, {parse_mode : 'html'}).catch((err) => console.log(err));
     });
   }
 });
@@ -109,7 +110,9 @@ const alertsButtons = (alerts) => {
 }
 
 const alertsKeyboard = Markup.keyboard([
-  ['📢 New alert', '🗑️ Delete alert', '🔍 List alerts'], // Row1 with 2 buttons
+  ['📢 New alert'],
+  ['🗑️ Delete alert', '🔍 List alerts'],
+  ['📇 List stations'] // Row1 with 2 buttons
 ])
 .resize()
 .extra();
@@ -128,6 +131,22 @@ newAlertScene.hears([/line (\d+)/gi, /route (\d+)/gi], async ctx => {
   var description = ctx.match[1];
   var userId = ctx.update.message.from.id;
   var alert = await addAlert(userId, description);
+  if(!alert) {
+    await ctx.reply('👎 An error has occurred. Try again.');
+  } else {
+    if(alert._id) {
+      await ctx.reply('👍 Alert added!');
+    } else {
+      await ctx.reply(`👎 An error has occurred. Try again.\n${alert.message}`);
+    }
+  }
+    return await ctx.scene.leave();
+});
+
+newAlertScene.on('text', async ctx => {
+  var description = ctx.update.message.text;
+  var userId = ctx.update.message.from.id;
+  var alert = await addAlert(userId, description);
   // console.log(alert);
   if(!alert) {
     await ctx.reply('👎 An error has occurred. Try again.');
@@ -139,11 +158,9 @@ newAlertScene.hears([/line (\d+)/gi, /route (\d+)/gi], async ctx => {
     }
   }
     return await ctx.scene.leave();
-    // console.log('left');
-});
-
+})
 newAlertScene.on('message', ctx => {
-  ctx.replyWithHTML('🔒 This is the pattern you should follow:<b>\nLine 1\nLine 3\nRoute 12\nRoute 510</b>');
+  ctx.replyWithHTML('🔒 This is the pattern you should follow:<b>\nLine 1\nLine 3\nRoute 12\nRoute 510\nFinch\nVaughan Metropolitan Centre</b>');
 });
 
 const listAlertScene = new Scene('list');

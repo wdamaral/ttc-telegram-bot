@@ -1,6 +1,10 @@
 var { Alert } = require('../models/alert');
 var {mongoose} = require('../db/mongoose');
 
+var hasNumbers = (filter) => {
+    return /\d/.test(filter);
+}
+
 var getAllAlerts = (userId) => {
     return Alert.find({
         userId
@@ -36,13 +40,22 @@ var deleteAlert = (userId, id) => {
 }
 
 var getUsers = async (userFilter) => {
-    var userFilter = userFilter.replace('/', ' ');
+    var arrayFilter = [];
     var newFilter = userFilter.substr(0, userFilter.indexOf(':'));
-    newFilter = newFilter.split(' ');
+    console.log(newFilter);
+    if(hasNumbers(newFilter)) {
+        userFilter = userFilter.replace(/\/|,/g, ' ');
+        newFilter = newFilter.split(' ');
 
-    var arrayFilter = newFilter.filter((el) => {
-        return el.length && el==+el;
-    });
+        arrayFilter = newFilter.filter((el) => {
+            return el.length && el==+el;
+        });
+        // console.log(arrayFilter);
+    } else {
+        var newFilter = userFilter.substr(0, userFilter.indexOf(':'));
+        console.log(newFilter);
+        arrayFilter[0] = newFilter;
+    }
 
     var users = await Alert.find({ text: { $in: arrayFilter } }, (err, result) => {
             return result;
