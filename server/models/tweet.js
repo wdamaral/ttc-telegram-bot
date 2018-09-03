@@ -13,6 +13,10 @@ var TweetSchema = new mongoose.Schema({
     tweetId: {
         type: String,
         required: true
+    },
+    affects: {
+        type: Array,
+        default: []
     }
 });
 

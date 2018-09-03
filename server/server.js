@@ -10,10 +10,7 @@ const Stage = require('telegraf/stage');
 const Scene = require('telegraf/scenes/base');
 
 const express = require('express');
-// const mongodb = require('mongodb');
 
-// var {mongoose} = require('./db/mongoose');
-var { Alert } = require('./models/alert');
 
 const T = new Twit({
   consumer_key:         process.env.CONSUMER_KEY,
@@ -21,6 +18,8 @@ const T = new Twit({
   access_token:         process.env.ACCESS_TOKEN,
   access_token_secret:  process.env.ACCESS_TOKEN_SECRET
 });
+
+var { setFilterAffects, sendLogMessage } = require('./utils/utils');
 
 var {  
   getAllAlerts,
@@ -47,16 +46,15 @@ const twitterUserId = process.env.MONITOR_ID;
 
 var stream = T.stream('statuses/filter', { follow: twitterUserId });
 
-var sendLogMessage = (error) => {
-  return `There was a problem on the bot\n${error.message}`;
-}
-
 stream.on('tweet', async (tweet) => {
   var text = tweet.text;
   var createdAt = tweet.timestamp_ms;
   var tweetId = tweet.id;
+  var affects = setFilterAffects(tweet.text);
+
+  //verify if tweet starts with RT or contains @TTCnotices
   try {
-    var tweet = await addTweet(text, createdAt, tweetId);
+    var tweet = await addTweet(text, createdAt, tweetId, affects);
   } catch(err) {
     return bot.telegram.sendMessage(process.env.MY_ID, sendLogMessage(err));
   }
@@ -65,21 +63,24 @@ stream.on('tweet', async (tweet) => {
   if(tweet) {
     try {
       var users = await getUsers(tweet.text);
+      console.log(users);
     } catch (err){
       return bot.telegram.sendMessage(process.env.MY_ID, sendLogMessage(err));
     }
-    console.log(users);
+    
     if(!users) {
       return
     }
+
     var message = 
     `🚫 <strong>TTC</strong> has just informed an issue on the system.
     
     💬 <strong>${tweet.text.substr(0, tweet.text.indexOf(':'))}:</strong> ${tweet.text.substring(tweet.text.indexOf(':') + 1)}
 
-    🕑 <strong>When:</strong> <i>${moment(tweet.createdAt, 'x').format('LLL')}</i>`
+    🕑 <strong>When:</strong> <i>${moment(tweet.createdAt, 'x').format('LLL')}</i>`;
+
     users.forEach(user => {
-      console.log('entrou');
+      // console.log('entrou');
           bot.telegram.sendMessage(user, message, {parse_mode : 'html'}).catch((err) => console.log(err));
     });
   }
@@ -89,14 +90,13 @@ stream.on('delete', async (tweet) => {
   try {
     await deleteTweet(tweet.id)
   } catch(err) {
-    bot.telegram.sendMessage(process.env.MY_ID, sendLogMessage(err));
+    return bot.telegram.sendMessage(process.env.MY_ID, sendLogMessage(err));
   }
 });
 
 bot.start(async ctx => {
   var name = ctx.update.message.from.first_name;
-  await ctx.replyWithHTML(`Welcome <b>${name}</b>.`);
-  await ctx.reply('What do you want to do❓', alertsKeyboard);
+  await ctx.replyWithHTML(`Welcome <b>${name}</b>.\nWhat do you want to do❓`,alertsKeyboard);
 });
 
 const alertsButtons = (alerts) => {

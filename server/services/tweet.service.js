@@ -1,5 +1,4 @@
 var { Tweet } = require('../models/tweet');
-var {mongoose} = require('../db/mongoose');
 
 var getAllTweets = () => {
     return Tweet.find()
@@ -10,18 +9,22 @@ var getAllTweets = () => {
       });
 }
 
-var addTweet = (text, createdAt, tweetId) => {
-    var tweet = new Tweet({
-        text,
-        createdAt,
-        tweetId
-    });
-
-    return tweet.save().then((doc) => {
-        return doc;
-    }, (e) => {
-        return e;
-    });
+var addTweet = (text, createdAt, tweetId, affects) => {
+    if(!text.includes('@TTCnotices')) {
+        var tweet = new Tweet({
+            text,
+            createdAt,
+            tweetId,
+            affects
+        });
+    
+        return tweet.save().then((doc) => {
+            return doc;
+        }, (e) => {
+            return e;
+        });
+    }
+    return;
 }
 
 var deleteTweet = (tweetId) => {

@@ -1,9 +1,5 @@
 var { Alert } = require('../models/alert');
-var {mongoose} = require('../db/mongoose');
-
-var hasNumbers = (filter) => {
-    return /\d/.test(filter);
-}
+var { setFilterAffects, hasNumbers } = require('../utils/utils');
 
 var getAllAlerts = (userId) => {
     return Alert.find({
@@ -39,22 +35,11 @@ var deleteAlert = (userId, id) => {
     });
 }
 
-var getUsers = async (userFilter) => {
-    var arrayFilter = [];
-    var newFilter = userFilter.substr(0, userFilter.indexOf(':'));
-    console.log(newFilter);
-    if(hasNumbers(newFilter)) {
-        userFilter = userFilter.replace(/\/|,/g, ' ');
-        newFilter = newFilter.split(' ');
+var getUsers = async (tweet) => {
+    var arrayFilter = setFilterAffects(tweet);
 
-        arrayFilter = newFilter.filter((el) => {
-            return el.length && el==+el;
-        });
-        // console.log(arrayFilter);
-    } else {
-        var newFilter = userFilter.substr(0, userFilter.indexOf(':'));
-        console.log(newFilter);
-        arrayFilter[0] = newFilter;
+    if(!hasNumbers(arrayFilter.toString())) {
+        arrayFilter = new RegExp(arrayFilter.toString(), 'i');
     }
 
     var users = await Alert.find({ text: { $in: arrayFilter } }, (err, result) => {
