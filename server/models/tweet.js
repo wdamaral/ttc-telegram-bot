@@ -14,10 +14,7 @@ var TweetSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    affects: {
-        type: Array,
-        default: []
-    }
+    affects: [String]
 });
 
 var Tweet = mongoose.model('Tweet', TweetSchema);

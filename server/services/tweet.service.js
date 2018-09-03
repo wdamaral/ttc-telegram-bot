@@ -9,7 +9,7 @@ var getAllTweets = () => {
       });
 }
 
-var addTweet = (text, createdAt, tweetId, affects) => {
+var addTweet = async (text, createdAt, tweetId, affects) => {
     if(!text.includes('@TTCnotices')) {
         var tweet = new Tweet({
             text,
@@ -17,14 +17,16 @@ var addTweet = (text, createdAt, tweetId, affects) => {
             tweetId,
             affects
         });
-    
+
         return tweet.save().then((doc) => {
+            // console.log(doc);
             return doc;
         }, (e) => {
+            // console.log(e);
             return e;
         });
     }
-    return;
+    return Promise.reject('Retweet');
 }
 
 var deleteTweet = (tweetId) => {

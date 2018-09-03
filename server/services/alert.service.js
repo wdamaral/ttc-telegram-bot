@@ -1,3 +1,5 @@
+var { mongoose } = require('mongoose');
+
 var { Alert } = require('../models/alert');
 var { setFilterAffects, hasNumbers } = require('../utils/utils');
 
@@ -37,6 +39,7 @@ var deleteAlert = (userId, id) => {
 
 var getUsers = async (tweet) => {
     var arrayFilter = setFilterAffects(tweet);
+    console.log(arrayFilter);
 
     if(!hasNumbers(arrayFilter.toString())) {
         arrayFilter = new RegExp(arrayFilter.toString(), 'i');

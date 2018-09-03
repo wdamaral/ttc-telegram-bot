@@ -1,5 +1,7 @@
 require('./config/config');
 
+var {mongoose} = require('./db/mongoose');
+
 const Telegraf = require('telegraf');
 const { Extra, Markup } = require('telegraf');
 const Twit = require('twit');
@@ -51,19 +53,22 @@ stream.on('tweet', async (tweet) => {
   var createdAt = tweet.timestamp_ms;
   var tweetId = tweet.id;
   var affects = setFilterAffects(tweet.text);
-
+  var myTweet;
+  // console.log(affects);
   //verify if tweet starts with RT or contains @TTCnotices
+  
   try {
-    var tweet = await addTweet(text, createdAt, tweetId, affects);
+    myTweet = await addTweet(text, createdAt, tweetId, affects);
+    // console.log('My Tweet' + myTweet);
   } catch(err) {
-    return bot.telegram.sendMessage(process.env.MY_ID, sendLogMessage(err));
+      return bot.telegram.sendMessage(process.env.MY_ID, sendLogMessage(err));
   }
   
 
-  if(tweet) {
+  if(myTweet) {
     try {
-      var users = await getUsers(tweet.text);
-      console.log(users);
+      var users = await getUsers(myTweet.text);
+      // console.log(users);
     } catch (err){
       return bot.telegram.sendMessage(process.env.MY_ID, sendLogMessage(err));
     }
@@ -75,9 +80,9 @@ stream.on('tweet', async (tweet) => {
     var message = 
     `🚫 <strong>TTC</strong> has just informed an issue on the system.
     
-    💬 <strong>${tweet.text.substr(0, tweet.text.indexOf(':'))}:</strong> ${tweet.text.substring(tweet.text.indexOf(':') + 1)}
+    💬 <strong>${myTweet.text.substr(0, myTweet.text.indexOf(':'))}:</strong> ${myTweet.text.substring(myTweet.text.indexOf(':') + 1)}
 
-    🕑 <strong>When:</strong> <i>${moment(tweet.createdAt, 'x').format('LLL')}</i>`;
+    🕑 <strong>When:</strong> <i>${moment(myTweet.createdAt, 'x').format('LLL')}</i>`;
 
     users.forEach(user => {
       // console.log('entrou');
@@ -92,11 +97,6 @@ stream.on('delete', async (tweet) => {
   } catch(err) {
     return bot.telegram.sendMessage(process.env.MY_ID, sendLogMessage(err));
   }
-});
-
-bot.start(async ctx => {
-  var name = ctx.update.message.from.first_name;
-  await ctx.replyWithHTML(`Welcome <b>${name}</b>.\nWhat do you want to do❓`,alertsKeyboard);
 });
 
 const alertsButtons = (alerts) => {
@@ -116,6 +116,11 @@ const alertsKeyboard = Markup.keyboard([
 ])
 .resize()
 .extra();
+
+bot.start(async ctx => {
+  var name = ctx.update.message.from.first_name;
+  await ctx.replyWithHTML(`Welcome <b>${name}</b>.\nWhat do you want to do❓`,alertsKeyboard);
+});
 
 const newAlertScene = new Scene('newAlert');
 
@@ -168,7 +173,6 @@ const listAlertScene = new Scene('list');
 listAlertScene.enter(async ctx => {
   var userId = ctx.update.message.from.id;
   var alerts = await getAllAlerts(userId);
-  // console.log(alerts);
   
   if(alerts.length) {
     await ctx.replyWithHTML('<b>Here are your alerts</b>\nClick on them to remove.', alertsButtons(alerts));
