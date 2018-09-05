@@ -13,7 +13,6 @@ const Scene = require('telegraf/scenes/base');
 
 const express = require('express');
 
-
 const T = new Twit({
   consumer_key:         process.env.CONSUMER_KEY,
   consumer_secret:      process.env.CONSUMER_SECRET,
@@ -61,6 +60,7 @@ stream.on('tweet', async (tweet) => {
     myTweet = await addTweet(text, createdAt, tweetId, affects);
     // console.log('My Tweet' + myTweet);
   } catch(err) {
+    console.log('error after addTweet: ' + err);
       return bot.telegram.sendMessage(process.env.MY_ID, sendLogMessage(err));
   }
   
@@ -68,8 +68,10 @@ stream.on('tweet', async (tweet) => {
   if(myTweet) {
     try {
       var users = await getUsers(myTweet.text);
-      // console.log(users);
+      console.log('checked users: ' + users);
+
     } catch (err){
+      console.log('Error after checking users: ' + err);
       return bot.telegram.sendMessage(process.env.MY_ID, sendLogMessage(err));
     }
     

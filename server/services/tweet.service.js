@@ -26,7 +26,7 @@ var addTweet = async (text, createdAt, tweetId, affects) => {
             return e;
         });
     }
-    return Promise.reject('Retweet');
+    return;
 }
 
 var deleteTweet = (tweetId) => {
