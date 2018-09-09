@@ -1,10 +1,22 @@
 var { Tweet } = require('../models/tweet');
+const moment = require('moment');
 
-var getAllTweets = () => {
-    return Tweet.find()
+var getLastTweets = (affects, hours) => {
+    let timeDif = moment().subtract(hours, 'hours');
+    
+    affects = affects.map((route) => {
+        return new RegExp(route, 'i');
+    });
+
+    return Tweet.find({ 
+            affects: { $in: affects },
+            createdAt: {
+                $gt: timeDif
+            }
+        })
         .then((tweets) => {
-        return tweets; 
-      }, (e) => {
+            return tweets; 
+        }, (e) => {
         return e;
       });
 }
@@ -19,10 +31,8 @@ var addTweet = async (text, createdAt, tweetId, affects) => {
         });
 
         return tweet.save().then((doc) => {
-            // console.log(doc);
             return doc;
         }, (e) => {
-            // console.log(e);
             return e;
         });
     }
@@ -40,7 +50,7 @@ var deleteTweet = (tweetId) => {
 }
 
 module.exports = {
-    getAllTweets,
+    getLastTweets,
     addTweet,
     deleteTweet
 }

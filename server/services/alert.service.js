@@ -1,13 +1,28 @@
 var { mongoose } = require('mongoose');
 
 var { Alert } = require('../models/alert');
-var { setFilterAffects, hasNumbers } = require('../utils/utils');
+var { setFilterAffects } = require('../utils/utils');
 
 var getAllAlerts = (userId) => {
     return Alert.find({
         userId
       }).then((alerts) => {
         return alerts; 
+      }, (e) => {
+        return e;
+      });
+}
+
+var getAlertAffects = (userId) => {
+    return Alert.find({
+        userId
+      }).then((alerts) => {
+        let affects = [];
+        alerts.forEach(alert => {
+            affects.push(alert.text);
+        });
+
+        return affects;
       }, (e) => {
         return e;
       });
@@ -38,14 +53,13 @@ var deleteAlert = (userId, id) => {
 }
 
 var getUsers = async (tweet) => {
-    var arrayFilter = setFilterAffects(tweet);
-    console.log(arrayFilter);
+    var allFilters = setFilterAffects(tweet);
 
-    if(!hasNumbers(arrayFilter.toString())) {
-        arrayFilter = new RegExp(arrayFilter.toString(), 'i');
-    }
+    var affects = allFilters.map((filter) => {
+        return new RegExp(filter, 'i');
+    });
 
-    var users = await Alert.find({ text: { $in: arrayFilter } }, (err, result) => {
+    var users = await Alert.find({ text: { $in: affects } }, (err, result) => {
             return result;
         }, (e) => {
             return e;
@@ -59,35 +73,12 @@ var getUsers = async (tweet) => {
     return uniqueUsers;
 }
 
-var addDescription = (userFilter) => {
-    var description;
-
-    if(!isNaN(userFilter * 1)) {
-        switch (userFilter) {
-            
-            case '1':
-            case '2':
-            case '3':
-                description = 'Line ' + userFilter;
-                break;
-        
-            default:
-                description = 'Route ' + userFilter;
-                // console.log(description);
-                break;
-        }
-    } else {
-        description = userFilter;
-    }
-    return description;
-}
-
 module.exports = {
     getAllAlerts,
     addAlert,
     deleteAlert,
     getUsers,
-    addDescription
+    getAlertAffects
 }
 
 

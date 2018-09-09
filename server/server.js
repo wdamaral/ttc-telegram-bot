@@ -20,18 +20,23 @@ const T = new Twit({
   access_token_secret:  process.env.ACCESS_TOKEN_SECRET
 });
 
-var { setFilterAffects, sendLogMessage } = require('./utils/utils');
+var { 
+  setFilterAffects, 
+  sendLogMessage, 
+  createMessage,
+  addDescription
+} = require('./utils/utils');
 
 var {  
   getAllAlerts,
   deleteAlert,
   addAlert,
   getUsers,
-  addDescription
+  getAlertAffects
 } = require('./services/alert.service');
 
 var {  
-  getAllTweets,
+  getLastTweets,
   deleteTweet,
   addTweet 
 } = require('./services/tweet.service');
@@ -48,19 +53,17 @@ const twitterUserId = process.env.MONITOR_ID;
 var stream = T.stream('statuses/filter', { follow: twitterUserId });
 
 stream.on('tweet', async (tweet) => {
+  var myTweet;
   var text = tweet.text;
   var createdAt = tweet.timestamp_ms;
   var tweetId = tweet.id;
   var affects = setFilterAffects(tweet.text);
-  var myTweet;
-  // console.log(affects);
-  //verify if tweet starts with RT or contains @TTCnotices
+  
+  //verify if tweet contains @TTCnotices
   
   try {
     myTweet = await addTweet(text, createdAt, tweetId, affects);
-    // console.log('My Tweet' + myTweet);
   } catch(err) {
-    console.log('error after addTweet: ' + err);
       return bot.telegram.sendMessage(process.env.MY_ID, sendLogMessage(err));
   }
   
@@ -68,10 +71,8 @@ stream.on('tweet', async (tweet) => {
   if(myTweet) {
     try {
       var users = await getUsers(myTweet.text);
-      console.log('checked users: ' + users);
 
     } catch (err){
-      console.log('Error after checking users: ' + err);
       return bot.telegram.sendMessage(process.env.MY_ID, sendLogMessage(err));
     }
     
@@ -79,15 +80,9 @@ stream.on('tweet', async (tweet) => {
       return
     }
 
-    var message = 
-    `🚫 <strong>TTC</strong> has just informed an issue on the system.
-    
-    💬 <strong>${myTweet.text.substr(0, myTweet.text.indexOf(':'))}:</strong> ${myTweet.text.substring(myTweet.text.indexOf(':') + 1)}
-
-    🕑 <strong>When:</strong> <i>${moment(myTweet.createdAt, 'x').format('LLL')}</i>`;
+    var message = createMessage(myTweet);
 
     users.forEach(user => {
-      // console.log('entrou');
           bot.telegram.sendMessage(user, message, {parse_mode : 'html'}).catch((err) => console.log(err));
     });
   }
@@ -107,44 +102,72 @@ const alertsButtons = (alerts) => {
         return Markup.callbackButton(`${addDescription(item.text)}`, `delete ${item._id}`);
     });
 
-  // console.log(buttons);
   return Extra.markup(Markup.inlineKeyboard(buttons, { columns: 2 }));
 }
 
+const timeFrameButtons = () => {
+  return Markup.inlineKeyboard([
+      Markup.callbackButton('<2 hours', `lastAlerts 2`),
+      Markup.callbackButton('<4 hours', `lastAlerts 4`),
+      Markup.callbackButton('<6 hours', `lastAlerts 6`),
+      Markup.callbackButton('<8 hours', `lastAlerts 8`)
+    ]).extra()
+}
+
 const alertsKeyboard = Markup.keyboard([
-  ['📢 New alert'],
-  ['🗑️ Delete alert', '🔍 List alerts'],
-  ['📇 List stations'] // Row1 with 2 buttons
+  ['📢 Create alert'],
+  ['🔍 Show MY alerts', '🔍 Show TTC alerts'],
+  // ['📇 List stations'] // Row1 with 2 buttons
 ])
 .resize()
 .extra();
 
+const generateLastAlertsMessage = async (ctx, hours) => {
+  var userId = ctx.chat.id;
+  var affects = await getAlertAffects(userId);
+  var alerts = await getLastTweets(affects, hours);
+  
+  if(alerts.length) {
+    var msg = '';
+    
+    alerts.forEach(element => {
+      msg = msg + `<strong>Where:</strong> ${element.text}\n<strong>When:</strong> ${moment(element.createdAt, 'x').format('LLL')}\n\n`
+    });
+
+    return await ctx.replyWithHTML(`<b>Here are the alerts posted by TTC in the last ${hours}</b>\n${msg}`);
+  } else if(!alerts.message) {
+    return await ctx.replyWithMarkdown(`😔 Sorry! No alerts have been posted in the last *${hours} hours*.`);
+  } 
+    return await ctx.reply('⚠️ An error has occurred. Try again.');
+}
+
 bot.start(async ctx => {
   var name = ctx.update.message.from.first_name;
-  await ctx.replyWithHTML(`Welcome <b>${name}</b>.\nWhat do you want to do❓`,alertsKeyboard);
+  await ctx.replyWithHTML(`Welcome <b>${name}</b>.\nWhat do you want me to do❓`,alertsKeyboard);
 });
 
 const newAlertScene = new Scene('newAlert');
 
 newAlertScene.enter(ctx => {
-  ctx.replyWithHTML('<b>Type the station, line or route you want to be alerted.</b>\n<i>Eg. Line 1, Route 34, Victoria Park</i>');
+  ctx.replyWithMarkdown('*Send me a route, station or subway line you want to be alerted.*\n_Eg. Line 1, Route 34, Victoria Park_');
 });
 
 newAlertScene.leave(ctx => {
-  ctx.reply('What do you want to do❓', alertsKeyboard);
+  ctx.replyWithMarkdown('*What do you want me to do*❓', alertsKeyboard);
 });
 
-newAlertScene.hears([/line (\d+)/gi, /route (\d+)/gi], async ctx => {
+newAlertScene.hears([/line (\d+.?)/gi, /route (\d+.?)/gi], async ctx => {
   var description = ctx.match[1];
+console.log(ctx.match);
   var userId = ctx.update.message.from.id;
   var alert = await addAlert(userId, description);
   if(!alert) {
     await ctx.reply('👎 An error has occurred. Try again.');
   } else {
     if(alert._id) {
-      await ctx.reply('👍 Alert added!');
+      await ctx.replyWithMarkdown('💾 I saved your alert.\n🔍 I\'ll monitor TTC from now on!');
     } else {
-      await ctx.reply(`👎 An error has occurred. Try again.\n${alert.message}`);
+      await ctx.reply(`⚠️ An error has occurred. Try again.\n${alert.message}`);
     }
   }
     return await ctx.scene.leave();
@@ -159,15 +182,16 @@ newAlertScene.on('text', async ctx => {
     await ctx.reply('👎 An error has occurred. Try again.');
   } else {
     if(alert._id) {
-      await ctx.reply('👍 Alert added!');
+      await ctx.replyWithMarkdown('💾 I saved your alert.\n🔍 I\'ll monitor TTC from now on!');
     } else {
-      await ctx.reply(`👎 An error has occurred. Try again.\n${alert.message}`);
+      await ctx.reply(`⚠️ An error has occurred. Try again.\n${alert.message}`);
     }
   }
     return await ctx.scene.leave();
 })
+
 newAlertScene.on('message', ctx => {
-  ctx.replyWithHTML('🔒 This is the pattern you should follow:<b>\nLine 1\nLine 3\nRoute 12\nRoute 510\nFinch\nVaughan Metropolitan Centre</b>');
+  ctx.replyWithHTML('⚠️ This is the pattern you should follow:<b>\nLine 1\nLine 3\nRoute 12\nRoute 510\nFinch\nVaughan Metropolitan Centre</b>');
 });
 
 const listAlertScene = new Scene('list');
@@ -182,9 +206,27 @@ listAlertScene.enter(async ctx => {
     await ctx.reply('😔 You don\'t have any alerts registered.');
     ctx.scene.leave();
   } else {
-    await ctx.reply('👎 An error has occurred. Try again.');
+    await ctx.reply('⚠️ An error has occurred. Try again.');
     ctx.scene.leave();
   }
+});
+
+const lastAlertsScene = new Scene('last');
+
+lastAlertsScene.enter(async ctx => {
+  var userId = ctx.update.message.from.id;
+  return await ctx.replyWithMarkdown('🕖 *Select the time space you want to see the alerts or type it.*', timeFrameButtons());
+});
+
+lastAlertsScene.hears(/\d+/, async ctx => {
+  var hours = ctx.match[0];
+
+  return generateLastAlertsMessage(ctx, hours);
+});
+
+lastAlertsScene.on('message', ctx => {
+  var userName = ctx.update.message.from.first_name;
+  ctx.replyWithMarkdown(`Sorry *${userName}*, I can only undestand *hours* in numbers. Also, keep in mind that I only store alerts from the *last 48 hours*.`);
 });
 
 bot.action(/delete (.*)/, async ctx => {
@@ -194,7 +236,7 @@ bot.action(/delete (.*)/, async ctx => {
   var res = await deleteAlert(userId, id);
   console.log(res);
   if(!res) {
-    ctx.reply('👎 An error has occurred. Try again.');
+    ctx.reply('⚠️ An error has occurred. Try again.');
     
   } else {
     var alerts = await getAllAlerts(userId);
@@ -209,10 +251,10 @@ bot.action(/delete (.*)/, async ctx => {
   }
 });
 
-
-// listAlertScene.leave(ctx => {
-//   ctx.reply('What do you want to do?', alertsKeyboard);
-// });
+bot.action(/lastAlerts (\d+)/, async ctx => {
+  var hours = ctx.match[1];
+  return generateLastAlertsMessage(ctx, hours);
+});
 
 if(process.env.NODE_ENV === 'production') {
 bot.telegram.setWebhook(`${URL}/bot${BOT_TOKEN}`);
@@ -226,13 +268,48 @@ app.get('/', (req, res) => {
 
 //SESSION HANDLER
 
-const stage = new Stage([newAlertScene, listAlertScene]);
+const stage = new Stage([newAlertScene, listAlertScene, lastAlertsScene]);
 bot.use(session());
 bot.use(stage.middleware());
 
-bot.hears('📢 New alert', Stage.enter('newAlert'));
-bot.hears(['🗑️ Delete alert', '🔍 List alerts'], Stage.enter('list'));
+bot.hears('📢 Create alert', Stage.enter('newAlert'));
+bot.hears(['🔍 Show MY alerts'], Stage.enter('list'));
+bot.hears(['🔍 Show TTC alerts'], Stage.enter('last'));
 
+bot.command('help', ctx => {
+  var userName = ctx.update.message.from.first_name;
+  ctx.replyWithMarkdown(`All right *${userName}*. Thanks for having me on your telegram. 
+  
+I *promise to send you all notifications that TTC posts*, but to do it I need you to read some instructions. 
+
+*Here they are:*
+*First*, If you type /start, below the typing box I'll show you a menu with some options. 
+
+They are simple and easy to follow. 
+You tell me what you need and I execute. 
+
+The options are:
+*1) Create alert*
+  Here you will define *routes, stations and subways* you want to be alerted in case of any issue.
+  I only understand the following pattern:
+    _Route nnn_ where _'n'_ is a number. You *must* write _route_ or _line_ before a number. _Eg: Line 1, Line 2, Route 34, Route 24B._
+
+  After you typed, I'll save it on me and check if there is any alert to send to you. 
+  I won't bother you with problems that you don't need to know. *Am I cool*?
+
+*2) List MY alerts*
+  Here I'll show you what alerts you asked me to create. 
+  Each one will be a button and if you click, I will remove the alert then I won't tell you anything about it anymore. *Easy, isn't it?*
+
+*3) List TTC alerts*
+  Another cool thing I provide to you. 
+  Let's say you want to see the alerts from the _last 15 hours_. Just type *15* and I show the alerts.
+  I try to make it simple showing you some buttons. If you click on *<2*, I'll show you the alerts from the last 2 hours.
+  *Remember*, I'll only show you alerts that you asked me to create, ok?
+
+*That's it. Hope you like me!*
+  `)
+})
 //app.post()
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
