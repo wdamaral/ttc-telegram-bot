@@ -41,6 +41,8 @@ var {
   addTweet 
 } = require('./services/tweet.service');
 
+var stations = require('./utils/ttc-stations.json');
+
 const app = express();
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
@@ -114,9 +116,20 @@ const timeFrameButtons = () => {
     ]).extra()
 }
 
+const stationsButtons = () => {
+  var ttcStations = stations.stations;
+
+  const buttons = ttcStations
+    .map(station => {
+        return Markup.callbackButton(`${station}`, `alert ${station}`);
+    });
+
+  return Extra.markup(Markup.inlineKeyboard(buttons, { columns: 2 }));
+}
 const alertsKeyboard = Markup.keyboard([
   ['📢 Create alert'],
   ['🔍 Show MY alerts', '🔍 Show TTC alerts'],
+  ['🔍 Show TTC stations']
   // ['📇 List stations'] // Row1 with 2 buttons
 ])
 .resize()
@@ -158,7 +171,7 @@ newAlertScene.leave(ctx => {
 
 newAlertScene.hears([/line (\d+.?)/gi, /route (\d+.?)/gi], async ctx => {
   var description = ctx.match[1];
-console.log(ctx.match);
+
   var userId = ctx.update.message.from.id;
   var alert = await addAlert(userId, description);
   if(!alert) {
@@ -177,7 +190,7 @@ newAlertScene.on('text', async ctx => {
   var description = ctx.update.message.text;
   var userId = ctx.update.message.from.id;
   var alert = await addAlert(userId, description);
-  // console.log(alert);
+  
   if(!alert) {
     await ctx.reply('👎 An error has occurred. Try again.');
   } else {
@@ -232,9 +245,8 @@ lastAlertsScene.on('message', ctx => {
 bot.action(/delete (.*)/, async ctx => {
   var userId = ctx.chat.id;
   const id = ctx.match[1];
-  // console.log(id);
   var res = await deleteAlert(userId, id);
-  console.log(res);
+
   if(!res) {
     ctx.reply('⚠️ An error has occurred. Try again.');
     
@@ -256,6 +268,23 @@ bot.action(/lastAlerts (\d+)/, async ctx => {
   return generateLastAlertsMessage(ctx, hours);
 });
 
+bot.action(/alert ([^\r]*)/, async ctx => {
+  const userId = ctx.chat.id;
+  var station = ctx.match[1];
+
+  var alert = await addAlert(userId, station);
+  
+  if(!alert) {
+    await ctx.reply('👎 An error has occurred. Try again.');
+  } else {
+    if(alert._id) {
+      await ctx.replyWithMarkdown('💾 I saved your alert.\n🔍 I\'ll monitor TTC from now on!');
+    } else {
+      await ctx.reply(`⚠️ An error has occurred. Try again.\n${alert.message}`);
+    }
+  }
+});
+
 if(process.env.NODE_ENV === 'production') {
 bot.telegram.setWebhook(`${URL}/bot${BOT_TOKEN}`);
 app.use(bot.webhookCallback(`/bot${BOT_TOKEN}`));
@@ -273,8 +302,11 @@ bot.use(session());
 bot.use(stage.middleware());
 
 bot.hears('📢 Create alert', Stage.enter('newAlert'));
-bot.hears(['🔍 Show MY alerts'], Stage.enter('list'));
-bot.hears(['🔍 Show TTC alerts'], Stage.enter('last'));
+bot.hears('🔍 Show MY alerts', Stage.enter('list'));
+bot.hears('🔍 Show TTC alerts', Stage.enter('last'));
+bot.hears('🔍 Show TTC stations', async ctx => {
+  await ctx.replyWithHTML('*Here there are all TTC stations. Click on them to add the alert.', stationsButtons());
+});
 
 bot.command('help', ctx => {
   var userName = ctx.update.message.from.first_name;
