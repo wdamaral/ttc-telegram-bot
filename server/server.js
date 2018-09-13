@@ -1,8 +1,6 @@
 require('./config/config');
 
-var {
-  mongoose
-} = require('./db/mongoose');
+var { mongoose } = require('./db/mongoose');
 
 const Telegraf = require('telegraf');
 const {
@@ -151,19 +149,25 @@ const alertsKeyboard = Markup.keyboard([
 
 const helpButtons = (step) => {
   var buttons;
-  if(step === 1) {
+  if (step === 1) {
     buttons = Extra.markdown().markup(Markup.inlineKeyboard([
       Markup.callbackButton('>>', '>')
-    ], {columns: 1}));
+    ], {
+      columns: 1
+    }));
   } else if (step < 5) {
     buttons = Extra.markdown().markup(Markup.inlineKeyboard([
       Markup.callbackButton('<<', '<'),
       Markup.callbackButton('>>', '>')
-    ], {columns: 2}));
+    ], {
+      columns: 2
+    }));
   } else {
     buttons = Extra.markdown().markup(Markup.inlineKeyboard([
       Markup.callbackButton('<<', '<')
-    ], {columns: 1}));
+    ], {
+      columns: 1
+    }));
   }
 
   return buttons;
@@ -173,7 +177,7 @@ const generateLastAlertsMessage = async (ctx, hours) => {
   var userId = ctx.chat.id;
   var affects = await getAlertAffects(userId);
   var alerts = await getLastTweets(affects, hours);
-
+  
   if (alerts.length) {
     var msg = '';
 
@@ -181,11 +185,13 @@ const generateLastAlertsMessage = async (ctx, hours) => {
       msg = msg + `<strong>Where:</strong> ${element.text}\n<strong>When:</strong> ${moment(element.createdAt, 'x').format('LLL')}\n\n`
     });
 
-    return await ctx.replyWithHTML(`<b>Here are the alerts posted by TTC in the last ${hours}</b>\n${msg}`);
+      await ctx.replyWithHTML(`<b>Here are the alerts posted by TTC in the last ${hours} hours.</b>\n${msg}`);
   } else if (!alerts.message) {
-    return await ctx.replyWithMarkdown(`😔 Sorry! No alerts have been posted in the last *${hours} hours*.`);
+      await ctx.replyWithMarkdown(`😔 Sorry! No alerts have been posted in the last *${hours} hours*.`);
+  } else {
+    return await ctx.reply('⚠️ An error has occurred. Try again.');
   }
-  return await ctx.reply('⚠️ An error has occurred. Try again.');
+  return await ctx.scene.leave();
 }
 
 bot.start(async ctx => {
@@ -267,12 +273,22 @@ lastAlertsScene.enter(async ctx => {
 lastAlertsScene.hears(/\d+/, async ctx => {
   var hours = ctx.match[0];
 
+  generateLastAlertsMessage(ctx, hours);
+  return ctx.scene.leave();
+});
+
+lastAlertsScene.action(/lastAlerts (\d+)/, async ctx => {
+  var hours = ctx.match[1];
   return generateLastAlertsMessage(ctx, hours);
 });
 
 lastAlertsScene.on('message', ctx => {
   var userName = ctx.update.message.from.first_name;
-  ctx.replyWithMarkdown(`Sorry *${userName}*, I can only undestand *hours* in numbers. Also, keep in mind that I only store alerts from the *last 48 hours*.`);
+  return ctx.replyWithMarkdown(`Sorry *${userName}*, I can only undestand *hours* in numbers. Also, keep in mind that I only store alerts from the *last 48 hours*.`);
+});
+
+lastAlertsScene.leave(ctx => {
+  ctx.replyWithMarkdown('*What do you want me to do*❓', alertsKeyboard);
 });
 
 bot.action(/delete (.*)/, async ctx => {
@@ -294,11 +310,6 @@ bot.action(/delete (.*)/, async ctx => {
       await ctx.editMessageText('🗑️ All alerts removed.');
     }
   }
-});
-
-bot.action(/lastAlerts (\d+)/, async ctx => {
-  var hours = ctx.match[1];
-  return generateLastAlertsMessage(ctx, hours);
 });
 
 bot.action(/alert ([^\r]*)/, async ctx => {
@@ -338,7 +349,7 @@ bot.hears('📢 Create alert', Stage.enter('newAlert'));
 bot.hears('🔍 Show MY alerts', Stage.enter('list'));
 bot.hears('🔍 Show TTC alerts', Stage.enter('last'));
 bot.hears('🔍 Show TTC stations', async ctx => {
-  await ctx.replyWithHTML('*Here there are all TTC stations. Click on them to add the alert.', stationsButtons());
+  return await ctx.replyWithHTML('*Here there are all TTC stations. Click on them to add the alert.', stationsButtons());
 });
 
 let step = 1;
@@ -346,17 +357,21 @@ bot.command('help', async ctx => {
   step = 1;
   var userName = ctx.update.message.from.first_name;
   await ctx.replyWithMarkdown(`All right *${userName}*. Thanks for having me on your telegram.`);
-  await ctx.replyWithMarkdown(getMessageStep(step), helpButtons(step));
+  return await ctx.replyWithMarkdown(getMessageStep(step), helpButtons(step));
 });
 
 bot.action('<', ctx => {
   step--;
-  return ctx.editMessageText(getMessageStep(step), helpButtons(step), {parse_mode: 'Markdown'});
+  return ctx.editMessageText(getMessageStep(step), helpButtons(step), {
+    parse_mode: 'Markdown'
+  });
 });
 
 bot.action('>', ctx => {
   step++;
-  return ctx.editMessageText(getMessageStep(step), helpButtons(step), {parse_mode: 'Markdown'});
+  return ctx.editMessageText(getMessageStep(step), helpButtons(step), {
+    parse_mode: 'Markdown'
+  });
 });
 
 

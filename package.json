@@ -18,5 +18,9 @@
     "mongoose": "^5.2.7",
     "telegraf": "^3.22.2",
     "twit": "^2.2.11"
+  },
+  "devDependencies": {
+    "eslint": "^5.5.0",
+    "eslint-config-google": "^0.10.0"
   }
 }
