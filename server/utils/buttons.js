@@ -4,6 +4,8 @@ const {
   Markup
 } = require('telegraf');
 
+const { addDescription } = require('./utils');
+
 const alertsButtons = (alerts) => {
     const buttons = alerts
       .map(item => {
