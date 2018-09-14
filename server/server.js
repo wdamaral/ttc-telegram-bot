@@ -321,24 +321,25 @@ bot.hears('🔍 Show TTC alerts', Stage.enter('last'));
 bot.hears('🔍 Show TTC stations', async ctx => {
   return await ctx.replyWithHTML('*Here there are all TTC stations. Click on them to add the alert.', stationsButtons());
 });
-
-let step = 1;
 bot.command('help', async ctx => {
-  step = 1;
+  ctx.session.step = 1;
+  let step = ctx.session.step;
   var userName = ctx.update.message.from.first_name;
   await ctx.replyWithMarkdown(`All right *${userName}*. Thanks for having me on your telegram.`);
   return await ctx.replyWithMarkdown(getMessageStep(step), helpButtons(step));
 });
 
 bot.action('<', ctx => {
-  step--;
+  ctx.session.step--;
+  let step = ctx.session.step;
   return ctx.editMessageText(getMessageStep(step), helpButtons(step), {
     parse_mode: 'Markdown'
   });
 });
 
 bot.action('>', ctx => {
-  step++;
+  ctx.session.step++;
+  let step = ctx.session.step;
   return ctx.editMessageText(getMessageStep(step), helpButtons(step), {
     parse_mode: 'Markdown'
   });
