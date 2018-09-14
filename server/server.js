@@ -45,6 +45,20 @@ var {
   addTweet
 } = require('./services/tweet.service');
 
+var {
+  addUser,
+  getUser,
+  deleteUsers
+} = require('./services/user.service');
+
+var {
+  alertsButtons,
+  timeFrameButtons,
+  stationsButtons,
+  helpButtons,
+  alertsKeyboard
+} = require('./utils/buttons');
+
 var stations = require('./utils/ttc-stations.json');
 
 const app = express();
@@ -59,6 +73,9 @@ const twitterUserId = process.env.MONITOR_ID;
 var stream = T.stream('statuses/filter', {
   follow: twitterUserId
 });
+
+bot.use(session());
+
 
 stream.on('tweet', async (tweet) => {
   var myTweet;
@@ -106,75 +123,8 @@ stream.on('delete', async (tweet) => {
   }
 });
 
-const alertsButtons = (alerts) => {
-  const buttons = alerts
-    .map(item => {
-      return Markup.callbackButton(`${addDescription(item.text)}`, `delete ${item._id}`);
-    });
-
-  return Extra.markup(Markup.inlineKeyboard(buttons, {
-    columns: 2
-  }));
-}
-
-const timeFrameButtons = () => {
-  return Markup.inlineKeyboard([
-    Markup.callbackButton('<2 hours', `lastAlerts 2`),
-    Markup.callbackButton('<4 hours', `lastAlerts 4`),
-    Markup.callbackButton('<6 hours', `lastAlerts 6`),
-    Markup.callbackButton('<8 hours', `lastAlerts 8`)
-  ]).extra()
-}
-
-const stationsButtons = () => {
-  var ttcStations = stations.stations;
-
-  const buttons = ttcStations
-    .map(station => {
-      return Markup.callbackButton(`${station}`, `alert ${station}`);
-    });
-
-  return Extra.markup(Markup.inlineKeyboard(buttons, {
-    columns: 2
-  }));
-}
-const alertsKeyboard = Markup.keyboard([
-    ['📢 Create alert'],
-    ['🔍 Show MY alerts', '🔍 Show TTC alerts'],
-    ['🔍 Show TTC stations']
-    // ['📇 List stations'] // Row1 with 2 buttons
-  ])
-  .resize()
-  .extra();
-
-const helpButtons = (step) => {
-  var buttons;
-  if (step === 1) {
-    buttons = Extra.markdown().markup(Markup.inlineKeyboard([
-      Markup.callbackButton('>>', '>')
-    ], {
-      columns: 1
-    }));
-  } else if (step < 5) {
-    buttons = Extra.markdown().markup(Markup.inlineKeyboard([
-      Markup.callbackButton('<<', '<'),
-      Markup.callbackButton('>>', '>')
-    ], {
-      columns: 2
-    }));
-  } else {
-    buttons = Extra.markdown().markup(Markup.inlineKeyboard([
-      Markup.callbackButton('<<', '<')
-    ], {
-      columns: 1
-    }));
-  }
-
-  return buttons;
-}
-
 const generateLastAlertsMessage = async (ctx, hours) => {
-  var userId = ctx.chat.id;
+  var userId = ctx.session.user._id;;
   var affects = await getAlertAffects(userId);
   var alerts = await getLastTweets(affects, hours);
   
@@ -194,15 +144,32 @@ const generateLastAlertsMessage = async (ctx, hours) => {
   return await ctx.scene.leave();
 }
 
+const getMe = async (ctx) => {
+  var userId = ctx.update.message.from.id;
+  ctx.session.user = await getUser(userId);
+  // await console.log(ctx.session);
+  
+  if(!ctx.session.user) {
+    try {
+      ctx.session.user = await addUser(userId);
+    } catch (e) {
+      return await ctx.reply(`⚠️ An error has occurred. Try again typing /start.\n${alert.message}`);
+    }
+  }
+  return true;
+}
+
 bot.start(async ctx => {
   var name = ctx.update.message.from.first_name;
+  await getMe(ctx);
   await ctx.replyWithHTML(`Welcome <b>${name}</b>.\nWhat do you want me to do❓`, alertsKeyboard);
 });
 
 const newAlertScene = new Scene('newAlert');
 
-newAlertScene.enter(ctx => {
-  ctx.replyWithMarkdown('*Send me a route, station or subway line you want to be alerted.*\n_Eg. Line 1, Route 34, Victoria Park_');
+newAlertScene.enter(async ctx => {
+  await getMe(ctx);
+  return await ctx.replyWithMarkdown('*Send me a route, station or subway line you want to be alerted.*\n_Eg. Line 1, Route 34, Victoria Park_');
 });
 
 newAlertScene.leave(ctx => {
@@ -210,9 +177,9 @@ newAlertScene.leave(ctx => {
 });
 
 newAlertScene.hears([/line (\d+.?)/gi, /route (\d+.?)/gi], async ctx => {
+  // await getMe(ctx);
   var description = ctx.match[1];
-
-  var userId = ctx.update.message.from.id;
+  var userId = ctx.session.user._id;
   var alert = await addAlert(userId, description);
   if (!alert) {
     await ctx.reply('👎 An error has occurred. Try again.');
@@ -227,8 +194,9 @@ newAlertScene.hears([/line (\d+.?)/gi, /route (\d+.?)/gi], async ctx => {
 });
 
 newAlertScene.on('text', async ctx => {
+  // await getMe(ctx);
   var description = ctx.update.message.text;
-  var userId = ctx.update.message.from.id;
+  var userId = ctx.session.user._id;;
   var alert = await addAlert(userId, description);
 
   if (!alert) {
@@ -250,7 +218,8 @@ newAlertScene.on('message', ctx => {
 const listAlertScene = new Scene('list');
 
 listAlertScene.enter(async ctx => {
-  var userId = ctx.update.message.from.id;
+  await getMe(ctx);
+  var userId = ctx.session.user._id;;
   var alerts = await getAllAlerts(userId);
 
   if (alerts.length) {
@@ -267,10 +236,12 @@ listAlertScene.enter(async ctx => {
 const lastAlertsScene = new Scene('last');
 
 lastAlertsScene.enter(async ctx => {
+  await getMe(ctx);
   return await ctx.replyWithMarkdown('🕖 *Select the time space you want to see the alerts or type it.*', timeFrameButtons());
 });
 
 lastAlertsScene.hears(/\d+/, async ctx => {
+  
   var hours = ctx.match[0];
 
   generateLastAlertsMessage(ctx, hours);
@@ -292,7 +263,7 @@ lastAlertsScene.leave(ctx => {
 });
 
 bot.action(/delete (.*)/, async ctx => {
-  var userId = ctx.chat.id;
+  var userId = ctx.session.user._id;
   const id = ctx.match[1];
   var res = await deleteAlert(userId, id);
 
@@ -313,7 +284,7 @@ bot.action(/delete (.*)/, async ctx => {
 });
 
 bot.action(/alert ([^\r]*)/, async ctx => {
-  const userId = ctx.chat.id;
+  const userId = ctx.session.user._id;;
   var station = ctx.match[1];
 
   var alert = await addAlert(userId, station);
@@ -342,7 +313,6 @@ app.get('/', (req, res) => {
 //SESSION HANDLER
 
 const stage = new Stage([newAlertScene, listAlertScene, lastAlertsScene]);
-bot.use(session());
 bot.use(stage.middleware());
 
 bot.hears('📢 Create alert', Stage.enter('newAlert'));

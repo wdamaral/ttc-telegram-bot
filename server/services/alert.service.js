@@ -3,9 +3,9 @@ var { mongoose } = require('mongoose');
 var { Alert } = require('../models/alert');
 var { setFilterAffects } = require('../utils/utils');
 
-var getAllAlerts = (userId) => {
+var getAllAlerts = (_creator) => {
     return Alert.find({
-        userId
+        _creator
       }).then((alerts) => {
         return alerts; 
       }, (e) => {
@@ -13,9 +13,9 @@ var getAllAlerts = (userId) => {
       });
 }
 
-var getAlertAffects = (userId) => {
+var getAlertAffects = (_creator) => {
     return Alert.find({
-        userId
+        _creator
       }).then((alerts) => {
         let affects = [];
         alerts.forEach(alert => {
@@ -28,9 +28,9 @@ var getAlertAffects = (userId) => {
       });
 }
 
-var addAlert = (userId, text) => {
+var addAlert = (_creator, text) => {
     var alert = new Alert({
-        userId,
+        _creator,
         text
     });
 
@@ -41,9 +41,9 @@ var addAlert = (userId, text) => {
     });
 }
 
-var deleteAlert = (userId, id) => {
+var deleteAlert = (_creator, id) => {
     return Alert.deleteOne({
-        userId,
+        _creator,
         _id: id
     }).then((doc) => {
         return doc;

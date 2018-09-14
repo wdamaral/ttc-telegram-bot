@@ -8,8 +8,8 @@ var AlertSchema = new mongoose.Schema({
         maxlength: 20,
         trim: true
     },
-    userId: {
-        type: Number,
+    _creator: {
+        type: mongoose.Schema.Types.ObjectId,
         required: true
     }
 });
