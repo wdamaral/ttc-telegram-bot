@@ -1,5 +1,5 @@
 
-var stations = require('./utils/ttc-stations.json');
+var stations = require('./ttc-stations.json');
 const {
   Extra,
   Markup
