@@ -26,7 +26,7 @@ var hasNumbers = (filter) => {
 }
 
 var hasAnyNumber = (filter) => {
-    return /\d+/.test(filter);
+    return /\d+$/.test(filter);
 }
 
 var sendLogMessage = (error) => {
@@ -94,6 +94,7 @@ var getMessageStep = (step) => {
 module.exports = {
     setFilterAffects,
     hasNumbers,
+    hasAnyNumber,
     sendLogMessage,
     createMessage,
     addDescription,

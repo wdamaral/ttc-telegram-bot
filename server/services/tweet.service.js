@@ -1,12 +1,17 @@
 var { Tweet } = require('../models/tweet');
 const moment = require('moment');
+var { hasAnyNumber } = require('../utils/utils');
 
 var getLastTweets = (affects, hours) => {
     let timeDif = moment().subtract(hours, 'hours');
     
     affects = affects.map((route) => {
-        return new RegExp(route, 'i');
+        if(!hasAnyNumber(route)) {
+            return new RegExp(route, 'i');
+        }
+        return route;
     });
+    console.log(affects);
 
     return Tweet.find({ 
             affects: { $in: affects },
