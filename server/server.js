@@ -318,7 +318,7 @@ bot.hears('📢 Create alert', Stage.enter('newAlert'));
 bot.hears('🔍 Show MY alerts', Stage.enter('list'));
 bot.hears('🔍 Show TTC alerts', Stage.enter('last'));
 bot.hears('🔍 Show TTC stations', async ctx => {
-  return await ctx.replyWithMarkdown('*Here there are all TTC stations. Click on them to add the alert.', stationsButtons());
+  return await ctx.replyWithHTML('<strong>Here there are all TTC stations</strong>. Click on them to add the alert.', stationsButtons());
 });
 bot.command('help', async ctx => {
   ctx.session.step = 1;
