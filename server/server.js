@@ -27,7 +27,6 @@ var {
   setFilterAffects,
   sendLogMessage,
   createMessage,
-  addDescription,
   getMessageStep
 } = require('./utils/utils');
 

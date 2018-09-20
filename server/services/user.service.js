@@ -31,6 +31,16 @@ var getUser = (userId) => {
     });
 }
 
+var getUsersByIds = (userIds) => {
+    // console.log(usersIds);
+    return User.find({_id: {$in: userIds}}, {
+    }).then((users) => {
+        return users;
+    }, (e) => {
+        return e;
+    });
+}
+
 var deleteUsers = () => {
     var hoursToDelete = 48;
     return User.deleteMany({
@@ -47,5 +57,6 @@ var deleteUsers = () => {
 module.exports = {
     addUser,
     getUser,
-    deleteUsers
+    deleteUsers,
+    getUsersByIds
 }

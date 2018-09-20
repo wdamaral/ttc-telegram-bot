@@ -11,7 +11,6 @@ var getLastTweets = (affects, hours) => {
         }
         return route;
     });
-    console.log(affects);
 
     return Tweet.find({ 
             affects: { $in: affects },

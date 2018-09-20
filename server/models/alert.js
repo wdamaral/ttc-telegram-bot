@@ -14,7 +14,7 @@ var AlertSchema = new mongoose.Schema({
     }
 });
 
-AlertSchema.index({userId: 1, text: 1}, {unique: true});
+AlertSchema.index({_creator: 1, text: 1}, {unique: true});
 
 var Alert = mongoose.model('Alert', AlertSchema);
 

@@ -1,7 +1,8 @@
 var { mongoose } = require('mongoose');
 
 var { Alert } = require('../models/alert');
-var { setFilterAffects } = require('../utils/utils');
+var { setFilterAffects, hasAnyNumber } = require('../utils/utils');
+var { getUsersByIds } = require('./user.service');
 
 var getAllAlerts = (_creator) => {
     return Alert.find({
@@ -56,14 +57,27 @@ var getUsers = async (tweet) => {
     var allFilters = setFilterAffects(tweet);
 
     var affects = allFilters.map((filter) => {
-        return new RegExp(filter, 'i');
+        if(!hasAnyNumber(filter)) {
+            return new RegExp(filter, 'i');
+        } else {
+            return filter;
+        }
+        
     });
 
-    var users = await Alert.find({ text: { $in: affects } }, (err, result) => {
-            return result;
+    var creators = await Alert.find({ text: { $in: affects } }, (err, allCreators) => {
+        // console.log(allUsers);
+        //==NEED TO CORRECT THIS STEP
+            return allCreators;
+            // return ids;
         }, (e) => {
             return e;
         });
+    let onlyIds = [... new Set(creators.map(item => item._creator))];
+    // console.log(onlyIds);
+    var users = await getUsersByIds(onlyIds);
+
+    // console.log(users);
 
     if(!users) {
         return [];
